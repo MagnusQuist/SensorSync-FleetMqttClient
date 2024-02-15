@@ -1,4 +1,4 @@
-package dk.sdu.mmmi.FleetClient.models;
+package dk.sdu.mmmi.FleetClient.entity;
 
 public class Message {
     private String client_id;
