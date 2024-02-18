@@ -22,6 +22,8 @@ public class MqttConfig {
     private String password;
     @Value("${athena.broker.user}")
     private String username;
+    @Value("${athena.broker.automaticReconnect}")
+    private boolean automaticReconnect;
 
     @Autowired
     private MqttMessageListener messageListener;
@@ -29,6 +31,7 @@ public class MqttConfig {
     @Bean
     public MqttConnectOptions mqttConnectOptions() {
         MqttConnectOptions options = new MqttConnectOptions();
+        options.setAutomaticReconnect(automaticReconnect);
         options.setPassword(password.toCharArray());
         options.setUserName(username);
         return options;

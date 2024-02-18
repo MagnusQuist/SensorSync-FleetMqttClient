@@ -14,8 +14,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class MqttMessageListener implements MqttCallback {
     private static final Logger log = LoggerFactory.getLogger(MqttMessageListener.class);
 
+    private final WebClient webClient;
+
     @Autowired
-    private WebClient.Builder webClientBuilder;
+    public MqttMessageListener(WebClient webClient) {
+        this.webClient = webClient;
+    }
+
 
     @Override
     public void connectionLost(Throwable throwable) {
@@ -25,8 +30,7 @@ public class MqttMessageListener implements MqttCallback {
     @Override
     public void messageArrived(String topic, MqttMessage message) {
         MqttResponse response = new MqttResponse(topic, message.getPayload());
-        webClientBuilder.build()
-                .post()
+        webClient.post()
                 .uri("http://localhost:8081/message")
                 .bodyValue(response)
                 .retrieve().bodyToMono(Void.class)

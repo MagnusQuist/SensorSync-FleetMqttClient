@@ -1,57 +1,57 @@
 package dk.sdu.mmmi.FleetClient.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dk.sdu.mmmi.FleetClient.config.Topics;
 import dk.sdu.mmmi.FleetClient.entity.DeviceDTO;
 import jakarta.annotation.PostConstruct;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 @Service
 public class MqttService {
     private static final Logger log = LoggerFactory.getLogger(MqttService.class);
     private final MqttClient mqttClient;
-    private final WebClient.Builder webClientBuilder;
+    private final ApiService apiService;
+    private final ObjectMapper objectMapper;
 
-    public MqttService(MqttClient mqttClient, WebClient.Builder webClientBuilder) {
+    @Autowired
+    public MqttService(MqttClient mqttClient, ApiService apiService, ObjectMapper objectMapper) {
         this.mqttClient = mqttClient;
-        this.webClientBuilder = webClientBuilder;
+        this.apiService = apiService;
+        this.objectMapper = objectMapper;
     }
 
     public void handleMessage(String topic, String message) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        if ("devices/new".equals(topic)) {
-            log.info("Trying to convert message to DeviceDTO...");
-            DeviceDTO device = objectMapper.readValue(message, DeviceDTO.class);
-            createDevice(device);
-        } else if ("lifecycle/status".equals(topic)) {
-            System.out.println("Got lifecycle status: " + message);
+        if (mqttClient.isConnected()) {
+            if (Topics.NEW_DEVICE.equals(topic)) {
+                log.info("Trying to convert message to DeviceDTO...");
+                DeviceDTO device = objectMapper.readValue(message, DeviceDTO.class);
+                apiService.createNewDevice(device);
+            } else if ("lifecycle/status".equals(topic)) {
+                System.out.println("Got lifecycle status: " + message);
+            }
+        } else {
+            log.error("MQTT client is not connected. Cannot handle message.");
         }
-    }
-
-    public void createDevice(DeviceDTO device) {
-        log.info("Sending new device to Device Manager: " + device.toString());
-        webClientBuilder.build()
-                .post()
-                .uri("http://localhost:8080/api/v1/devices")
-                .bodyValue(device)
-                .retrieve()
-                .bodyToMono(Void.class)
-                .subscribe();
     }
 
     @PostConstruct
     public void subscribe() {
-        try {
-            mqttClient.subscribe("devices/new");
-            mqttClient.subscribe("lifecycle/status");
-            log.info("Subscribed to topics");
-        } catch (MqttException e) {
-            e.printStackTrace();
+        if (mqttClient.isConnected()) {
+            try {
+                mqttClient.subscribe("devices/new");
+                mqttClient.subscribe("lifecycle/status");
+                log.info("Subscribed to topics");
+            } catch (MqttException e) {
+                log.error("Error subscribing to topics", e);
+            }
+        } else {
+            log.error("MQTT client is not connected. Cannot subscribe to topics.");
         }
     }
 }
